@@ -1,0 +1,613 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+% \usepackage[paperheight=16cm, paperwidth=12cm,% Set the height and width of the paper
+% includehead,
+% nomarginpar,% We don't want any margin paragraphs
+% textwidth=10cm,% Set \textwidth to 10cm
+% headheight=10mm,% Set \headheight to 10mm
+% ]{geometry}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{xspace}
+\usepackage{bm}
+\usepackage{bbm}
+\usepackage{xcolor}
+\usepackage[colorlinks,linkcolor=blue]{hyperref}
+\usepackage{graphicx}
+
+
+\makeatletter
+\DeclareRobustCommand\onedot{\futurelet\@let@token\@onedot}
+\def\@onedot{\ifx\@let@token.\else.\null\fi\xspace}
+\def\iid{\emph{i.i.d}\onedot} \def\IID{\emph{I.I.D}\onedot}
+\def\eg{\emph{e.g}\onedot} \def\Eg{\emph{E.g}\onedot}
+\def\ie{\emph{i.e}\onedot} \def\Ie{\emph{I.e}\onedot}
+\def\cf{\emph{c.f}\onedot} \def\Cf{\emph{C.f}\onedot}
+\def\etc{\emph{etc}\onedot} \def\vs{\emph{vs}\onedot}
+\def\wrt{w.r.t\onedot} \def\dof{d.o.f\onedot}
+\def\aka{\emph{a.k.a}\onedot}
+\def\etal{\emph{et al}\onedot}
+\makeatother
+
+\newcommand{\important}[1]{{\color{blue}{\bf\sf #1}}}
+
+\title{CPEN455: Deep Learning \\ Homework 1}
+\author{Seiya Nozawa-Temchenko}
+\date{Finished: Jan. 31, 2025}
+
+\begin{document}
+
+\pagestyle{fancy}
+\fancyhead{} % clear all header fields
+\fancyhead[L]{\textbf{UBC CPEN455 2024 Winter Term 2 }}
+\fancyhead[R]{\textbf{Homework 1}}
+
+\maketitle
+\thispagestyle{fancy}
+
+
+\section{Dropout [25pts]}
+Let us consider a single hidden layer MLP with \textit{M} hidden units. Suppose the input vector $\textbf{x} \in \mathbb{R}^{N \times 1}$. The hidden activations $\textbf{h} \in \mathbb{R}^{M \times 1}$ are computed as follows,
+\begin{equation}
+    \textbf{h}=\sigma (W \textbf{x}+\textbf{b})
+\end{equation}
+where weight matrix $W \in \mathbb{R}^{N \times M}$, bias vector $\textbf{b} \in \mathbb{R}^{M \times 1}$, and $\sigma$ is the nonlinear activation function.\\
+
+\textbf{Dropout} [1]  is a technique to help reduce overfitting for neural networks. In PyTorch, Dropout is implemented as follows. During training, we independently zero out elements of \textbf{h} with probability
+\textit{p} and then rescale it with $\frac{1}{1-p}$, \textit{i.e.},
+\begin{equation}
+    \textbf{\~h}=\frac{\textbf{m}}{1-p} \odot \textbf{h}
+\end{equation}
+\begin{equation}
+    \textbf{m}[i] \sim \text{Bernoulli}(1-p) \quad \forall i =1,...,M,
+\end{equation}
+where $\odot$ is the Hadamard product (\textit{a.k.a}, element-wise product and $\text{Bernoulli}(1-p)$ is the Bernoulli distribution where the random variable takes the value $1$ with the probability $1-p$. During testing, we just use $\textbf{\~h}=\textbf{h}$.\\
+
+\noindent
+\textbf{1.1 [5pts]} Explain why we need to rescale the hidden activations by $\frac{1}{1-p}$.\\
+
+{\color{blue} 
+Rescaling the hidden activation from \textbf{h} to $\textbf{\~h}$ by $\frac{1}{1-p}$ during training is done to compensate for the sum reduction caused by Dropout. Dropout randomly zeroes out a fraction $p$ of the hidden activation, reducing the total contribution of the hidden layer to the next layer. Without rescaling, the network's output would be smaller during training than during testing.} \\
+
+\noindent
+\textbf{1.2 [15pts]} Assume $\textbf{x} \sim \mathcal{N} (0, I)$, $\textbf{b} = 0$, $WW^{\top} = I_M$ ($I_M$ is an identity matrix with size $M \times M$), and we use rectified linear units (ReLU) as the nonlinear activation function, \textit{i.e.}, $\sigma (x) = \text{max}(x, 0)$, derive the variance of the activations before Dropout (\textit{i.e.}, \textbf{h}) and after Dropout (\textit{i.e.}, \textbf{\~h}).\\
+
+{\color{blue}
+Since $\textbf{b}=0$, $WW^{\top} = I_M$, and $\textbf{x} \sim \mathcal{N} (0, I)$, each element of $W\textbf{x}$ is distributed as $\mathcal{N} (0,1)$. Let pre-activation values $z_i \rightarrow z \sim \mathcal{N} (0, 1)$ for the sake of simplicity,
+\begin{equation}
+    \textbf{h}= \text{ReLU}(W \textbf{x})= \text{max}(W \textbf{x},0) \rightarrow h_i= \text{ReLU}[z]
+\end{equation}
+
+To compute Var[ReLU(\textit{z})], we must calculate the expectations:
+\begin{equation}
+    \text{Var[ReLU}(z)]= \mathbb{E}[\text{ReLU}^2(z)]- \mathbb{E}^2[\text{ReLU}(z)]
+\end{equation}
+\begin{equation}
+    \mathbb{E}[\text{ReLU}(z)]= \int_{-\infty}^{\infty} \text{ReLU}(z) f_{z}(z) \,dz
+\end{equation}
+
+We can use the PDF for a standard normal distribution $f_{z}(z)$ defined as:
+\begin{equation}
+    f_{z}(z)= \frac{1}{\sqrt{2 \pi}} \text{exp}(-\frac{z^2}{2})
+\end{equation}
+
+Since ReLU zeroes negative values, we can evaluate the expectation:
+\begin{equation}
+\begin{aligned}
+    \mathbb{E}[\text{ReLU}(z)] &= \int_{0}^{\infty} z  \frac{1}{\sqrt{2 \pi}} \text{exp}(-\frac{z^2}{2}) \,dz \\
+    u=-\frac{z^2}{2} &\rightarrow du=-zdz\\
+    \mathbb{E}[\text{ReLU}(z)] &= -\frac{1}{\sqrt{2 \pi}} \int_{0}^{\infty} \text{exp}(u) \,du\\
+    &= -\frac{1}{\sqrt{2 \pi}} \text{exp}(-\frac{z^2}{2}) \Big|_{0}^{\infty}= \frac{1}{\sqrt{2 \pi}}
+\end{aligned}
+\end{equation}
+
+Now we can compute square expectation which can be calculated using the concept of symmetry:
+\begin{equation}
+    \mathbb{E}[\text{ReLU}^2(z)] = \int_{0}^{\infty} z^2  \frac{1}{\sqrt{2 \pi}} \text{exp}(-\frac{z^2}{2}) \,dz 
+\end{equation}
+\begin{equation}
+    \mathbb{E}[z^2] = \text{Var}(z)+ \mathbb{E}^2[z]= 1+0=1
+\end{equation}
+\begin{equation}
+\begin{aligned}
+    \mathbb{E}[z^2  \mathbbm{1}(z>0)]= \mathbb{E}[z^2  \mathbbm{1}(z<0)]= \frac{1}{2} \mathbb{E}[z^2]&= \frac{1}{2}\\
+    \therefore \mathbb{E}[\text{ReLU}^2(z)]= \frac{1}{2}
+\end{aligned}
+\end{equation}
+
+We can now find the variance before Dropout by evaluating Var[ReLU($z$)] from (5):
+\begin{equation}
+\begin{aligned}
+    \text{Var[ReLU($z$)]}&= \mathbb{E}[\text{ReLU}^2(z)]- \mathbb{E}^2[\text{ReLU}(z)] \\
+    \text{Var}[h_i]&= \frac{1}{2}- \frac{1}{\sqrt{2 \pi}}= \frac{\pi-1}{2 \pi}
+\end{aligned}
+\end{equation}
+
+Now we can find the variance after Dropout.
+\begin{equation}
+    \tilde{h_i}= \frac{m_i}{1-p}h_i \quad m_i \sim \text{Bernoulli}(1-p)
+\end{equation}
+\begin{equation}
+    \text{Var}[aX]= a^2\text{Var}[X], \ \text{Var}[XY] = \text{Var}[X] \text{Var}[Y]+ \text{Var}[X] \mathbb{E}^2[Y]+ \text{Var}[Y] \mathbb{E}^2[X]
+\end{equation}
+\begin{equation}
+    \mathbb{E}[m_i]=1-p, \ \text{Var}[m_i]=p(1-p), \ \mathbb{E}[h_i]= \frac{1}{\sqrt{2 \pi}}, \ \text{Var}[h_i]=\frac{\pi -1}{2 \pi}
+\end{equation}
+\begin{equation}
+\begin{aligned}
+    \text{Var}[\tilde{h_i}]&= (\frac{1}{1-p})^2 \text{Var}[m_ih_i]\\
+    &= (\frac{1}{1-p})^2 [p(1-p)(\frac{\pi -1}{2 \pi})+p(1-p)(\frac{1}{\sqrt{2 \pi}})^2+(\frac{\pi -1}{2 \pi})(1-p)^2]\\
+    &= (\frac{1}{1-p})^2[(1-p)(\frac{\pi -1+p \pi}{2 \pi})]\\
+    \text{Var}[\tilde{h_i}]&= \frac{\pi -1+p(2- \pi)}{2 \pi (1-p)}
+\end{aligned}
+\end{equation}
+}
+
+\noindent
+\textbf{1.3 [5pts]} What is the expected number of hidden units that are kept (\textit{i.e.}, those with $\textbf{m}[i] = 1$) by Dropout? Derive the probability distribution (\textit{i.e.}, the probability mass function) of the number of kept hidden units.\\
+
+{\color{blue}
+Each hidden unit is kept with $1-p$ or dropped with $p$. With $M$ hidden units, the expected units kept can be found by:
+\begin{equation}
+    \mathbb{E}[K]=\sum_{i=1}^{M} \mathbb{E}[\textbf{m}[i]]= \sum_{i=1}^{M}(1-p)=M(1-p)
+\end{equation}
+
+Since each hidden unit is either kept or dropped and each unit is kept independently of others, the number of hidden units $K$ follows a binomial distribution. The PMF for $K$ is then given by choosing $k$ units of $M$, the probability of keeping $k$ units, and the probability of dropping the remaining $M-k$ units:
+\begin{equation}
+    K \sim \text{Binomial}(M,1-p)
+\end{equation}
+\begin{equation}
+    \mathbb{P}(K=k)= \binom{M}{k}(1-p)^kp^{M-k}, \ \binom{M}{k}=\frac{M!}{k!(M-k)!}
+\end{equation}
+}
+
+\noindent
+\textbf{1.4 [Bonus 10pts]} Assume the number of hidden units \textit{M} goes to infinity and the probability of keeping units $1-p$ goes to 0 in a way that their product $M (1-p)$ stays fixed. Derive the probability distribution of the number of kept hidden units.\\
+
+{\color{blue}
+The number of kept units $K$ follows a Binomial distribution in Eq. (18), with PMF in Eq. (19) for some $k=0,1,2,...,M$. We can apply the Poisson limit theorem that the Binomial distribution converges to a Poisson distribution since $M \rightarrow \infty$ and $1-p \rightarrow 0$ with $M(1-p)= \lambda$ held constant.
+\begin{equation}
+    \lambda = M(1-p) \rightarrow p = 1-\frac{\lambda}{M} \ \therefore p^M = (1-\frac{\lambda}{M})^M
+\end{equation}
+\begin{equation}
+    \lim_{M \rightarrow \infty}\left(1-\frac{\lambda}{M}\right)^M= e^{-\lambda} \ \therefore p^M \approx e^{-\lambda} 
+\end{equation}
+
+Since $k$ is fixed and $M$ is large, we can then approximate $p^{M-k}$ and $\binom{M}{k}$:
+\begin{equation}
+    p^{M-k} \approx p^M \approx e^{-\lambda}= e^{-M(1-p)}
+\end{equation}
+\begin{equation}
+    \binom{M}{k}= \frac{M!}{k!(M-k)!} \approx \frac{M^k}{k!}
+\end{equation}
+\begin{equation}
+\begin{aligned}
+    \mathbb{P}(K=k) &\approx \frac{M^k}{k!}(1-p)^ke^{-M(1-p)}\\
+    &= \frac{(M(1-p))^ke^{-M(1-p)}}{k!}= \frac{\lambda ^k e^{-\lambda}}{k!}
+\end{aligned}
+\end{equation}
+
+The number of hidden units kept $K$ then follows a Poisson distribution:
+\begin{equation}
+    K \sim \text{Poisson}(\lambda), \ \lambda = M(1-p)
+\end{equation}
+}
+
+\noindent
+\textbf{1.5 [Bonus 10pts]} Suppose the number of hidden units \textit{M} follows a Poisson distribution with parameter $\lambda$, \textit{i.e.}, the probability mass function is $\mathbb{P}(M = k) = \frac{\lambda^{k}e^{-\lambda}}{k!}$. Derive the probability
+distribution of the number of kept hidden units.\\
+
+{\color{blue}
+The number of hidden units $M$ follows a Poisson distribution with $\lambda$:
+\begin{equation}
+    \mathbb{P}(M=m)= \frac{\lambda ^m e^{-\lambda}}{m!}, \ m=0,1,2,...
+\end{equation}
+
+Given $M=m$, the number of kept units $K|M=m$ follows a Binomial distribution:
+\begin{equation}
+    K|M=m \sim \text{Binomial}(m, 1-p)
+\end{equation}
+\begin{equation}
+    \mathbb{P}(K=k|M=m)= \binom{m}{k}(1-p)^kp^{m-k}, \ k=0,1,2,...,m
+\end{equation}
+
+We can now derive the marginal (unconditional) distribution of $K$:
+\begin{equation}
+\begin{aligned}
+    \mathbb{P}(K=k) &= \sum_{m=k}^{\infty} \mathbb{P}(K=k|M=m) \mathbb{P}(M=m)\\
+    &= \sum_{m=k}^{\infty} \binom{m}{k}(1-p)^kp^{m-k} \frac{\lambda ^m e^{-\lambda}}{m!}, \ \binom{m}{k}= \frac{m!}{k!(m-k)!}\\
+    &= \frac{(1-p)^ke^{-\lambda}}{k!} \sum_{m=k}^{\infty} \frac{(\lambda p)^{m-k}}{(m-k)!}
+\end{aligned}
+\end{equation}
+
+Let $n=m-k$ to use the following Taylor series expansion for $e^{\lambda p}$ to simplify our expression:
+\begin{equation}
+    \sum_{m=k}^{\infty} \frac{(\lambda p)^{m-k}}{(m-k)!}= \sum_{n=0}^{\infty} \frac{(\lambda p)^n}{n!}= e^{\lambda p}
+\end{equation}
+\begin{equation}
+    \mathbb{P}(K=k) = \frac{(1-p)^ke^{-\lambda}}{k!}e^{\lambda p}= \frac{(1-p)^ke^{-\lambda(1-p)}}{k!}
+\end{equation} 
+
+We can incorporate the following simplification to align with the Poisson PMF:
+\begin{equation}
+    (1-p)^k= \left(\frac{\lambda (1-p)}{\lambda}\right)^k= \left(\frac{\lambda '}{\lambda}\right)^k \rightarrow (\lambda ') ^k= (\lambda(1-p))^k
+\end{equation}
+\begin{equation}
+    \therefore \mathbb{P}(K=k) = \frac{(\lambda(1-p))^ke^{-\lambda(1-p)}}{k!}= \frac{(\lambda ')^ke^{-\lambda '}}{k!}
+\end{equation}
+
+This is the PMF of a Poisson distribution $K \sim \text{Poisson}(\lambda ')$ with parameter $\lambda ' = \lambda(1-p)$.
+}
+
+\section{Batch Normalization [35pts]}
+\noindent
+Let us again consider a single hidden layer MLP with \textit{M} hidden units. Suppose we now have $B$ input vectors packed as a matrix such that each row is a sample, \textit{i.e.}, $X \in \mathbb{R}^{B \times N}$. The hidden activations $H \in \mathbb{R}^{B \times M}$ are computed as follows,
+\begin{equation}
+    Y=XW^{\top}+\textbf{b}^{\top}
+\end{equation}
+\begin{equation}
+    H=\sigma(Y)
+\end{equation}
+where weight matrix $W \in \mathbb{R}^{M \times N}$, bias vector $\textbf{b} \in \mathbb{R}^{M \times 1}$, and $\sigma$ is the nonlinear activation function. $XW^{\top} + \textbf{b}^{\top}$ leverages the \textit{broadcasting addition}. In particular, the shapes of $XW^{\top}$ and $\textbf{b}^{\top}$ are $B \times M$ and $1 \times M$, respectively. You can imagine that the broadcasting addition first duplicates $b^{\top}$ for $B$ times to create a matrix of shape $B \times M$ and then performs element-wise addition. Note that in the actual implementation, one does not perform duplication since it is a waste of memory. This is just a helpful way to understand how broadcasting operations work in a high level.\\
+
+\textbf{Batch normalization} (BN) [2], is a method that makes training of deep neural networks faster and more stable via normalizing the inputs of individual layers by re-centering and re-scaling. In particular, if we apply BN to pre-activations $Y$ in Eq. (34), we have 
+\begin{equation}
+    \textbf{m}=\frac{1}{B}\sum_{i=1}^{B} Y[i,:]
+\end{equation}
+\begin{equation}
+    \textbf{v}[j]=\frac{1}{B}\sum_{i=1}^{B} (Y[i,:]-\textbf{m}[j])^{2}
+\end{equation}
+\begin{equation}
+    \hat{Y}[i,j]=\boldsymbol{\gamma}[j] \frac{Y[i,j]-\textbf{m}[j]}{\sqrt{\textbf{v}[j]+\epsilon}}+\boldsymbol{\beta}[j]
+\end{equation}
+\noindent
+where the normalized input $\hat{Y} \in \mathbb{R}^{B \times M}$. $\textbf{m} \in \mathbb{R}^{M \times 1}$ and $\textbf{v} \in \mathbb{R}^{M \times 1}$ are the mean and the (dimension-wise) variance vectors. $\boldsymbol{\gamma} \in \mathbb{R}^{M \times 1}$ and $\boldsymbol{\beta} \in \mathbb{R}^{M \times 1}$ are learnable parameters associated with the BN layer. $\epsilon$ is a hyperparameter.\\
+
+\noindent
+\textbf{2.1 [5pts]} Explain why we need the hyperparameter $\epsilon$\\
+
+{\color{blue}
+The purpose of hyperparater $\epsilon$ in BN is for numerical stability or, more specifically, to prevent division by 0. Therefore, it is typically a very small number. It also plays a small role in the overall standardization process, enabling the BN layer to normalize the inputs. 
+}\\
+
+\noindent
+\textbf{2.2 [10pts]} Derive the mean and variance of $\hat{Y}[i,j]$ (ignore the effects of $\epsilon$ only for this question)\\
+
+{\color{blue}
+We can begin with deriving the mean of $\hat{Y}[i,j]$. Given Eq. (38), by definition of $\textbf{m}[j]$, we can find expectation $\mathbb{E}[Y[i,j]]$:
+\begin{equation}
+    \textbf{m}[j]= \frac{1}{B} \sum_{i=1}^{B}Y[i,j] \ \therefore \mathbb{E}[Y[i,j]]= \textbf{m}[j]
+\end{equation}
+
+Knowing this equivalence and assuming $\epsilon=0$, we can find the mean of $\hat{Y}[i,j]$. Note that the mean transformation property allows that $\mathbb{E}[aX+ b]= a \mathbb{E}[X]+b$.
+\begin{equation}
+    \mathbb{E}[Y[i,j]- \textbf{m}[j]]= \mathbb{E}[Y[i,j]]- \textbf{m}[j]= 0
+\end{equation}
+\begin{equation}
+    \mathbb{E}\left[\frac{Y[i,j]- \textbf{m}[j]}{\sqrt{\textbf{v}[j]}}\right]= \frac{1}{\sqrt{\textbf{v}[j]}} \mathbb{E}[Y[i,j]- \textbf{m}[j]]= 0
+\end{equation}
+\begin{equation}
+    \mathbb{E}[\hat{Y}[i,j]]= \boldsymbol{\gamma}[j] \mathbb{E}\left[\frac{Y[i,j]- \textbf{m}[j]}{\sqrt{\textbf{v}[j]}}\right]+ \boldsymbol{\beta}[j]= 0+ \boldsymbol{\beta}[j]= \boldsymbol{\beta}[j]
+\end{equation}
+
+We can find the variance of $\hat{Y}[i,j]$. Note that while $\boldsymbol{\gamma}[j]$ and $\boldsymbol{\beta}[j]$ are learnable parameters, which can be treated as constants during forward pass, they are not random variables in this context. Also note that the variance transformation property allows that $\text{Var}[aX+ b]= a^2 \text{Var}[X]$.
+\begin{equation}
+    \textbf{v}[j]=\frac{1}{B}\sum_{i=1}^{B} (Y[i,j]-\textbf{m}[j])^{2} \ \therefore \text{Var}[Y[i,j]]=\textbf{v}[j]
+\end{equation}
+\begin{equation}
+    \text{Var}[Y[i,j]- \textbf{m}[j]]= \text{Var}[Y[i,j]]= \textbf{v}[j]
+\end{equation}
+\begin{equation}
+    \text{Var}\left[\frac{Y[i,j]- \textbf{m}[j]}{\sqrt{\textbf{v}[j]}}\right]= \frac{1}{\textbf{v}[j]} \text{Var}[Y[i,j]- \textbf{m}[j]]= \frac{\textbf{v}[j]}{\textbf{v}[j]}= 1
+\end{equation}
+\begin{equation}
+    \text{Var}[\hat{Y}[i,j]]= \text{Var}\left[\boldsymbol{\gamma}[j] \frac{Y[i,j]- \textbf{m}[j]}{\sqrt{\textbf{v}[j]}}+ \boldsymbol{\beta}[j]\right]= \boldsymbol{\gamma}^2[j] \text{Var}\left[\frac{Y[i,j]- \textbf{m}[j]}{\sqrt{\textbf{v}[j]}}\right]= \boldsymbol{\gamma}^2[j]
+\end{equation}
+}
+
+\noindent
+\textbf{2.3 [20pts]} Suppose the nonlinear activation function is ReLU and the gradient of the training
+loss $\ell$ with respect to (w.r.t.) the normalized hidden activations $H$ is $\frac{\partial \ell}{\partial H}$. Derive the gradients of the training loss w.r.t. learnable parameters $\boldsymbol{\gamma}$ and $\boldsymbol{\beta}$, the mean \textbf{m}, the variance \textbf{v}, and the input \textit{Y}.\\
+
+{\color{blue}
+To derive the gradients of the training loss $\ell$ with respect to $\boldsymbol{\gamma}$, $\boldsymbol{\beta}$, \textbf{m}, \textbf{v}, and $Y$, we can use the chain rule. We are given BN transformation in Eq. (38) and the activation function is:
+\begin{equation}
+    H[i,j]=\text{ReLU}(\hat{Y}[i,j])=\text{max}(0,\hat{Y}[i,j])
+\end{equation}
+
+First, we will start with finding the gradients with respect to the learnable scale parameter $\boldsymbol{\gamma}$:
+\begin{equation}
+    \frac{\partial \ell}{\partial \boldsymbol{\gamma}[j]}= \sum_{i=1}^{B} \frac{\partial \ell}{\partial H[i,j]} \frac{\partial H[i,j]}{\partial \boldsymbol{\gamma}[j]}
+\end{equation}
+
+To compute $\frac{\partial H[i,j]}{\partial \boldsymbol{\gamma}[j]}$, we can refer to $H[i,j]= \text{ReLU}(\hat{Y}[i,j])$:
+\begin{equation}
+    \frac{\partial H[i,j]}{\partial \boldsymbol{\gamma}[j]}= \frac{\partial H[i,j]}{\partial \hat{Y}[i,j]} \frac{\partial \hat{Y}[i,j]}{\partial \boldsymbol{\gamma}[j]}
+\end{equation}
+\begin{equation}
+    \frac{\partial H[i,j]}{\partial \hat{Y}[i,j]}= \mathbbm{1}(\hat{Y}[i,j]>0)
+\end{equation}
+
+Note that the indicator function $\mathbbm{1}(\hat{Y}[i,j]>0)$ is a Boolean function to represent gradient flow activation for when $\hat{Y}[i,j]$ is positive.
+\begin{equation}
+    \frac{\partial \hat{Y}[i,j]}{\partial \boldsymbol{\gamma}[j]}= \frac{Y[i,j]-\textbf{m}[j]}{\sqrt{\textbf{v}[j]+ \epsilon}}
+\end{equation}
+\begin{equation}
+    \frac{\partial H[i,j]}{\partial \boldsymbol{\gamma}[j]}= \mathbbm{1}(\hat{Y}[i,j]>0) \frac{Y[i,j]-\textbf{m}[j]}{\sqrt{\textbf{v}[j]+ \epsilon}}
+\end{equation}
+\begin{equation}
+    \frac{\partial \ell}{\partial \boldsymbol{\gamma}[j]}= \sum_{i=1}^{B} \frac{\partial \ell}{\partial H[i,j]} \mathbbm{1}(\hat{Y}[i,j]>0) \frac{Y[i,j]-\textbf{m}[j]}{\sqrt{\textbf{v}[j]+ \epsilon}}
+\end{equation}
+
+Second, we will find the gradient with respect to learnable shift parameter $\boldsymbol{\beta}$:
+\begin{equation}
+    \frac{\partial \ell}{\partial \boldsymbol{\beta}[j]}= \sum_{i=1}^{B} \frac{\partial \ell}{\partial H[i,j]} \frac{\partial H[i,j]}{\partial \boldsymbol{\beta}[j]}
+\end{equation}
+
+To compute $\frac{\partial H[i,j]}{\partial \boldsymbol{\beta}[j]}$, we can use a similar equation to Eq. (49) and refer to Eq. (50) for the derivative of the ReLU function:
+\begin{equation}
+    \frac{\partial H[i,j]}{\partial \boldsymbol{\beta}[j]}= \frac{\partial H[i,j]}{\partial \hat{Y}[i,j]} \frac{\partial \hat{Y}[i,j]}{\partial \boldsymbol{\beta}[j]}
+\end{equation}
+\begin{equation}
+    \frac{\partial \hat{Y}[i,j]}{\partial \boldsymbol{\beta}[j]}= 1 \ \therefore \frac{\partial H[i,j]}{\partial \boldsymbol{\beta}[j]}= \mathbbm{1}(\hat{Y}[i,j]>0)
+\end{equation}
+\begin{equation}
+    \frac{\partial \ell}{\partial \boldsymbol{\beta}[j]}= \sum_{i=1}^{B} \frac{\partial \ell}{\partial H[i,j]} \mathbbm{1}(\hat{Y}[i,j]>0)
+\end{equation}
+
+Now we can find the gradient with respect to mean $\textbf{m}[j]$ by starting with the chain rule:
+\begin{equation}
+    \frac{\partial \ell}{\partial \textbf{m}[j]}= \sum_{k=1}^{B} \frac{\partial \ell}{\partial \hat{Y}[k,j]} \frac{\partial \hat{Y}[k,j]}{\partial \textbf{m}[j]}
+\end{equation}
+\begin{equation}
+    \frac{\partial \ell}{\partial \hat{Y}[k,j]}= \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0)
+\end{equation}
+
+We can now compute $\frac{\partial \hat{Y}[k,j]}{\partial \textbf{m}[j]}$ by differentiating the BN transformation in Eq. (38):
+\begin{equation}
+    \frac{\partial \hat{Y}[k,j]}{\partial \textbf{m}[j]}= \boldsymbol{\gamma}[j] \frac{\partial}{\partial \textbf{m}[j]} \left(\frac{Y[k,j]- \textbf{m}[j]}{\sqrt{\textbf{v}[j]+ \epsilon}}\right)= -\frac{\boldsymbol{\gamma}[j]}{\sqrt{\textbf{v}[j]+ \epsilon}}
+\end{equation}
+\begin{equation}
+\begin{aligned}
+    \frac{\partial \ell}{\partial \textbf{m}[j]}&= \sum_{k=1}^{B} \frac{\partial \ell}{\partial \hat{Y}[k,j]} \left(-\frac{\boldsymbol{\gamma}[j]}{\sqrt{\textbf{v}[j]+ \epsilon}} \right)\\
+    &= -\frac{\boldsymbol{\gamma}[j]}{\sqrt{\textbf{v}[j]+ \epsilon}} \sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0)
+\end{aligned}
+\end{equation}
+
+Next, we can find the gradient with respect to variance $\textbf{v}[j]$ by starting with the chain rule:
+\begin{equation}
+    \frac{\partial \ell}{\partial \textbf{v}[j]}= \sum_{k=1}^{B} \frac{\partial \ell}{\partial \hat{Y}[k,j]} \frac{\partial \hat{Y}[k,j]}{\partial \textbf{v}[j]}
+\end{equation}
+\begin{equation}
+    \frac{\partial \ell}{\partial \hat{Y}[k,j]}= \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0)
+\end{equation}
+
+We can now compute $\frac{\partial \hat{Y}[k,j]}{\partial \textbf{v}[j]}$ by differentiating the BN transformation in Eq. (38):
+\begin{equation}
+    \frac{\partial \hat{Y}[k,j]}{\partial \textbf{v}[j]}= \boldsymbol{\gamma}[j] \frac{\partial}{\partial \textbf{v}[j]} \left(\frac{Y[k,j]- \textbf{m}[j]}{\sqrt{\textbf{v}[j]+ \epsilon}} \right)= \boldsymbol{\gamma}[j] (Y[k,j]-\textbf{m}[j]) \left(-\frac{1}{2}(\textbf{v}[j]+ \epsilon)^{-\frac{3}{2}} \right)
+\end{equation}
+\begin{equation}
+\begin{aligned}
+    \frac{\partial \ell}{\partial \textbf{v}[j]}&= \sum_{k=1}^{B} \frac{\partial \ell}{\partial \hat{Y}[k,j]} \left(- \frac{\boldsymbol{\gamma}[j](Y[k,j]-\textbf{m}[j])}{2(\textbf{v}[j]+ \epsilon)^{\frac{3}{2}}} \right)\\
+    &= -\frac{\boldsymbol{\gamma}[j]}{2({\textbf{v}[j]+ \epsilon})^{\frac{3}{2}}} \sum_{k=1}^{B} (Y[k,j]-\textbf{m}[j]) \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0)
+\end{aligned}
+\end{equation}
+
+Lastly, we can find the gradient with respect to pre-activation inputs $Y$:
+\begin{equation}
+    \frac{\partial \ell}{\partial Y[i,j]}= \sum_{k=1}^{B} \frac{\partial \ell}{\partial \hat{Y}[k,j]} \frac{\partial \hat{Y}[k,j]}{\partial Y[i,j]} 
+\end{equation}
+\begin{equation}
+    \frac{\partial \ell}{\partial \hat{Y}[k,j]}= \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0)
+\end{equation}
+\begin{equation}
+    \frac{\partial \ell}{\partial Y[k,j]}= \sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0) \frac{\partial \hat{Y}[k,j]}{\partial Y[k,j}
+\end{equation}
+
+Each pre-activation output $\hat{Y}[k,j]$ depends on all $Y[\ell,j]$ in the batch through both the mean $\textbf{m}[j]$ and the variance $\textbf{v}[j]$. So when we compute $\frac{\partial \hat{Y}[k,j]}{\partial Y[i,j]}$, we must account for both direct and indirect dependencies. A direct dependency refers to when $k=i$, that $Y[k,j]$ directly affects $\hat{Y}[k,j]$. Indirect dependency refers to all $Y[k,j]$ affecting $\hat{Y}[k,j]$ through $\textbf{m}[j]$ and $\textbf{v}[j]$.
+\begin{equation}
+    \frac{\partial \hat{Y}[k,j]}{\partial Y[i,j]}=  \boldsymbol{\gamma}[j] \frac{\partial}{\partial Y[i,j]} \left(\frac{Y[k,j]- \textbf{m}[j]}{\sqrt{\textbf{v}[j]+ \epsilon}} \right)
+\end{equation}
+\begin{equation}
+    \frac{\partial}{\partial Y[i,j]} \left(\frac{Y[k,j]- \textbf{m}[j]}{\sqrt{\textbf{v}[j]+ \epsilon}} \right)= \frac{\frac{\partial}{\partial Y[i,j]}(Y[k,j]- \textbf{m}[j])}{\sqrt{\textbf{v}[j]+ \epsilon}}+ (Y[k,j]- \textbf{m}[j]) \frac{\partial}{\partial Y[i,j]} \left(\frac{1}{\sqrt{\textbf{v}[j]+ \epsilon}} \right)
+\end{equation}
+\begin{equation}
+    \frac{\partial}{\partial Y[i,j]}(Y[k,j]- \textbf{m}[j])= \delta(k=i)- \frac{1}{B}, \ \delta(k=i)= 
+        \begin{cases}
+            1, \ k=i\\
+            0, \ k \neq i
+        \end{cases}
+\end{equation}
+\begin{equation}
+\begin{aligned}
+    \frac{\partial}{\partial Y[i,j]} \left(\frac{1}{\sqrt{\textbf{v}[j]+ \epsilon}} \right)&= -\frac{1}{2} (\textbf{v}[j]+ \epsilon)^{-\frac{3}{2}} \frac{\partial \textbf{v}[j]}{\partial Y[i,j]}\\
+    &= -\frac{1}{2} (\textbf{v}[j]+ \epsilon)^{-\frac{3}{2}} \frac{2}{B} (Y[i,j]- \textbf{m}[j])\\
+    &= -\frac{Y[i,j]- \textbf{m}[j]}{B(\textbf{v}[j]+ \epsilon)^{\frac{3}{2}}}
+\end{aligned}
+\end{equation}
+\begin{equation}
+    \frac{\partial \hat{Y}[k,j]}{\partial Y[i,j]}= \boldsymbol{\gamma}[j] \left(\frac{\delta(k=i)- \frac{1}{B}}{\sqrt{\textbf{v}[j]+ \epsilon}}- \frac{(Y[k,j]- \textbf{m}[j])(Y[i,j]- \textbf{m}[j])}{B(\textbf{v}[j]+ \epsilon)^{\frac{3}{2}}}\right)
+\end{equation}
+\begin{equation}
+\begin{aligned}
+    \frac{\partial \ell}{\partial Y[i,j]}&= \sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0) \boldsymbol{\gamma}[j] 
+    \biggl( \frac{\delta(k=i)- \frac{1}{B}}{\sqrt{\textbf{v}[j]+ \epsilon}}- \frac{(Y[k,j]- \textbf{m}[j])(Y[i,j]- \textbf{m}[j])}{B(\textbf{v}[j]+ \epsilon)^{\frac{3}{2}}} \biggr)\\
+    &= \boldsymbol{\gamma}[j] 
+    \biggl( \sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0) \frac{\delta(k=i)- \frac{1}{B}}{\sqrt{\textbf{v}[j]+ \epsilon}} \\
+    &\quad - \sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0) 
+    \frac{(Y[k,j]- \textbf{m}[j])(Y[i,j]- \textbf{m}[j])}{B(\textbf{v}[j]+ \epsilon)^{\frac{3}{2}}} \biggr)
+\end{aligned}
+\end{equation}
+
+We can now focus on simplifying the expression:
+\begin{equation}
+\begin{aligned}
+    &\sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0) \left(\delta(k=i)- \frac{1}{B} \right)\\
+    &\quad = \sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0) \delta(k=i)- \sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0) \frac{1}{B}
+\end{aligned}
+\end{equation}
+\begin{equation}
+    \sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0) \delta(k=i)= \frac{\partial \ell}{\partial H[i,j]} \mathbbm{1}(\hat{Y}[k=i,j]>0)
+\end{equation}
+\begin{equation}
+\begin{aligned}
+    &\sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0) \frac{(Y[k,j]- \textbf{m}[j])(Y[i,j]- \textbf{m}[j])}{B(\textbf{v}[j]+ \epsilon)^{\frac{3}{2}}}\\
+    &\quad = \frac{Y[i,j]- \textbf{m}[j]}{B(\textbf{v}[j]+ \epsilon)^{\frac{3}{2}}} \sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0) (Y[k,j]- \textbf{m}[j]) 
+\end{aligned}
+\end{equation}
+\begin{equation}
+\begin{aligned}
+    \frac{\partial \ell}{\partial Y[i,j]}= &\frac{\boldsymbol{\gamma}[j]}{\sqrt{\textbf{v}[j]+ \epsilon}} \frac{\partial \ell}{\partial H[i,j]} \mathbbm{1}(\hat{Y}[i,j]>0)- \frac{\boldsymbol{\gamma}[j]}{B \sqrt{\textbf{v}[j]+ \epsilon}} \sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0)\\
+    &\quad - \frac{\boldsymbol{\gamma}[j] (Y[i,j]- \textbf{m}[j])}{B(\textbf{v}[j]+ \epsilon)^{\frac{3}{2}}} \sum_{k=1}^{B} \frac{\partial \ell}{\partial H[k,j]} \mathbbm{1}(\hat{Y}[k,j]>0) (Y[k,j]- \textbf{m}[j])
+\end{aligned}
+\end{equation}
+}
+
+\noindent
+\textbf{2.4 [Bonus 10pts]} BN only normalizes the hidden units in a dimension-wise fashion, \textit{e.g.}, the variance is computed per-dimension. Derive the equations of BN where the covariance matrix of the normalized input $\hat{Y}$ is normalized to an identity. Compare this version of BN to the original BN and discuss the pros and cons.\\
+
+{\color{blue}
+Standard BN normalizes each dimension independently, ensuring that each feature has zero mean and unit variance. However, because the normalization is done per-dimension, the off-diagonal elements between different dimensions are not removed. Basically, the covariance matrix of the BN-transformed activations is diagonal with ones on the diagonal but it is not necessarily the identity matrix since the off-diagonal entries or covariances may be non-zero. \\
+
+In order to normalize the full covariance matrix to the identity, we must de-correlate the dimensions and re-scale them. This can be done with a full whitening transformation by using Eq. (36), Eq. (37), and Eq. (38):
+\begin{equation}
+    \boldsymbol{\mu}= \frac{1}{B} \sum_{i=1}^{B} Y[i,:] \ \in \mathbb{R}^M
+\end{equation}
+\begin{equation}
+    \boldsymbol{\Sigma}= \frac{1}{B} \sum_{i=1}^{B} (Y[i,:]- \boldsymbol{\mu})(Y[i,:]- \boldsymbol{\mu})^{\top} \ \in \mathbb{R}^{M \times M}
+\end{equation}
+
+We can compute the whitening matrix $\boldsymbol{\Sigma}^{-\frac{1}{2}}$ and then apply the whitening transformation to the centered activations:
+\begin{equation}
+    \boldsymbol{\Sigma}^{-\frac{1}{2}} \boldsymbol{\Sigma}\boldsymbol{\Sigma}^{-\frac{1}{2}}= I
+\end{equation}
+\begin{equation}
+    \tilde{Y}[i,:]= \boldsymbol{\Sigma}^{-\frac{1}{2}} (Y[i,:]- \boldsymbol{\mu})
+\end{equation}
+
+To allow the network to learn, we introduce learnable parameters similar to standard BN (where $\Gamma$ is a diagonal matrix or vector of scale parameters):
+\begin{equation}
+    \hat{Y}[i,:]= \boldsymbol{\Gamma} \tilde{Y}[i,:]+ \boldsymbol{\beta}= \boldsymbol{\Gamma} \boldsymbol{\Sigma}^{-\frac{1}{2}} (Y[i,:]- \boldsymbol{\mu})+ \boldsymbol{\beta}
+\end{equation}
+
+\noindent
+Standard BN:
+\begin{itemize}
+    \item Normalizes each feature independently with zero mean and unit variance
+    \item Does not remove inter-feature correlations, so the covariance matrix remains diagonal but not necessarily the identity
+    \item Computationally efficient and easy to implement
+\end{itemize}
+
+\noindent
+Whitening BN:
+\begin{itemize}
+    \item Normalizes the full covariance matrix to the identity by removing correlations
+    \item Reduces redundancy and provides better-conditioned inputs for subsequent layers
+    \item More computationally expensive due to $\Sigma^{-\frac{1}{2}}$ and can cause numerical instability when $\Sigma$ is ill-conditioned
+\end{itemize}
+}
+
+\section{Back-Propagation and Initialization [40pts]}
+\noindent
+Suppose we have a deep MLP classifier and L hidden layers as follows.
+\begin{equation}
+    \textbf{h}_i=\sigma (W_i \textbf{h}_{i-1}+ \textbf{b}_i) \quad \forall i=1,...,L
+\end{equation}
+where the input data vector $\textbf{h}_0= \textbf{x} \in \mathbb{R}^{D_0 \times 1}$ and $\sigma$ is the nonlinear activation function. Weights and the bias vector of the \textit{i}-th layer are $W_i \in \mathbb{R}^{D_i \times D_{i-1}}$ and $\textbf{b}_i \in \mathbb{R}^{D_i \times 1}$ respectively. The readout
+function is the \textit{softmax}. In other words, the probability of the input \textbf{x} belong to the class \textit{k} is,
+\begin{equation}
+    \mathbb{P}(\textbf{x} \text{ belongs to class } k)= \textbf{y}[k]= \frac{\text{exp}(\textbf{h}_L[k])}{\sum_j \text{exp}(\textbf{h}_L[k])}
+\end{equation}
+where the input to the softmax $\textbf{h}_L[k]) \in \mathbb{R}^{D_L \times 1}$ is often called \textit{logits}. The dimension of the logits should be the same as the total number of classes \textit{K}, \textit{i.e.}, $D_L = K$. To train the classifier, we use cross-entropy loss as below,
+\begin{equation}
+    \ell (\bar{\textbf{y}},\textbf{y})=- \sum_{k=1}^{K} \bar{\textbf{y}}[k] \log \textbf{y}[k]
+\end{equation}
+where $\bar{\textbf{y}} \in \mathbb{R}^{K \times 1}$ is the ground-truth probability vector of the input \textbf{x}. Typically, it is a one-hot encoded vector, \textit{i.e.}, if input \textbf{x} of the training set belongs to the class \textit{c}, then $\bar{\textbf{y}}[c]=1$ and
+$\bar{\textbf{y}}[k]=0, \forall k \neq c$. \\
+N.B.: For simplicity, we only consider the case of a single sample in the above context, \textit{i.e.}, the
+batch dimension is ignored.\\
+
+\noindent
+\textbf{3.1 [15pts]} Derive the gradients of loss $\ell$ w.r.t. all hidden activations $\textbf{h}_i$. In particular, for any layer $1 \leq i \leq L$, you need to show how to derive $\frac{\partial \ell}{\partial \textbf{h}_i}$. You need to write down the shapes of all tensors involved in the final expressions.\\
+
+{\color{blue}
+To begin with the gradient at the output (layer $L$), we must first note that the softmax and cross-entropy loss have the following property. Note that $\textbf{y} \in \mathbb{R}^{K \times 1}$ is the vector of softmax outputs and $\bar{\textbf{y}} \in \mathbb{R}^{K \times 1}$ is the one-hot encoded ground-truth label. 
+\begin{equation}
+    \frac{\partial \ell}{\partial \textbf{h}_L}= \textbf{y}- \bar{\textbf{y}} \quad \frac{\partial \ell}{\partial \textbf{h}_L} \in \mathbb{R}^{K \times 1}
+\end{equation}
+
+To find the backpropagation to the hidden layers, for any hidden layer $i$:
+\begin{equation}
+    \textbf{h}_i= \sigma(W_i \textbf{h}_{i-1}+ \textbf{b}_i)
+\end{equation}
+
+To obtain $\frac{\partial \ell}{\partial \textbf{h}_i}$ in terms of the given variables, we can compute layer $i+1$ as:
+\begin{equation}
+    \textbf{h}_{i+1}= \sigma(W_{i+1} \textbf{h}_{i}+ \textbf{b}_{i+1})
+\end{equation}
+
+Then by the chain rule, the derivative of the loss with respect to $\textbf{h}_i$ is obtained by backpropagating through the linear transformation and the nonlinearity of layer $i+1$. 
+\begin{equation}
+    \frac{\partial \ell}{\partial \textbf{h}_i}= W_{i+1}^{\top} \left[\frac{\partial \ell}{\partial \textbf{h}_{i+1}} \odot \sigma ' (W_{i+1} \textbf{h}_i+ \textbf{b}_{i+1}) \right]
+\end{equation}
+
+Since $W_{i+1} \in \mathbb{R}^{D_{i+1} \times D_i}$, that $W_{i+1}^{\top} \in \mathbb{R}^{D_{i} \times D_{i+1}}$. Also since $\frac{\partial \ell}{\partial \textbf{h}_{i+1}} \in \mathbb{R}^{D_{i+1} \times 1}$, $\sigma ' (W_{i+1} \textbf{h}_i+ \textbf{b}_{i+1}) \in \mathbb{R}^{D_{i+1} \times 1}$, their element-wise product $\odot$ is in $\mathbb{R}^{D_{i+1} \times 1}$, and therefore the final product makes $\frac{\partial \ell}{\partial \textbf{h}_i} \in \mathbb{R}^{D_i \times 1}$.
+}\\
+
+\noindent
+\textbf{3.2 [10pts]} Derive the gradients of loss $\ell$ w.r.t. all weights $W_i$ and $\textbf{b}_i$. In particular, for any layer $1 \leq i \leq L$, you need to show how to derive $\frac{\partial \ell}{\partial W_i}$ and $\frac{\partial \ell}{\partial \textbf{b}_i}$. You need to write down the shapes of all tensors involved in the final expressions.\\
+
+{\color{blue}
+Since $W_i$ appears in the argument of $\sigma$ through term $W_i \textbf{h}_{i-1}+ \textbf{b}_i$, we use the chain rule. We can notice that the derivative of the term $W_i \textbf{h}_{i-1}$ with respect to $W_i$ is the input $\textbf{h}_{i-1}$ such that:
+\begin{equation}
+    \frac{\partial \ell}{\partial W_i}= \left[\frac{\partial \ell}{\partial \textbf{h}_i} \odot \sigma ' (W_i \textbf{h}_{i-1}+ \textbf{b}_i) \right] \textbf{h}_{i-1}^{\top}
+\end{equation}
+
+Since $\frac{\partial \ell}{\partial \textbf{h}_i} \in \mathbb{R}^{D_i \times 1}$, $\sigma ' (W_i \textbf{h}_{i-1}+ \textbf{b}_i \in \mathbb{R}^{D_i \times 1}$, their element-wise product is in $\mathbb{R}^{D_i \times 1}$. With $\textbf{h}_{i-1}^{\top} \in \mathbb{R}^{1 \times D_{i-1}}$, we see that $\frac{\partial \ell}{\partial W_i} \in \mathbb{R}^{D_i \times D_{i-1}}$, which matches with $W_i$. \\
+
+Since bias $\textbf{b}_i$ appears additively, its derivative is simply multiplied element-wise by the derivation of the activation function:
+\begin{equation}
+    \frac{\partial \ell}{\partial \textbf{b}_i}= \frac{\partial \ell}{\partial \textbf{h}_i} \odot \sigma '(W_i \textbf{h}_{i-1}+ \textbf{b}_i)
+\end{equation}
+
+Since $\frac{\partial \ell}{\partial \textbf{h}_i} \in \mathbb{R}^{D_i \times 1}$ and $\sigma '(W_i \textbf{h}_{i-1}+ \textbf{b}_i) \in \mathbb{R}^{D_i \times 1}$, their element-wise product and therefore $\frac{\partial \ell}{\partial \textbf{b}_i} \in \mathbb{R}^{D_i \times 1}$. 
+}\\
+
+\noindent
+\textbf{3.3 [15pts]} Derive the Kaiming initialization [3] in our context, \textit{i.e.}, applying the same variance analysis technique we learned from Xavier initialization [4] to this deep MLP with ReLU activations.\\
+
+{\color{blue}
+For forward variance propagation, we can begin with assumptions based on weight initialization:
+\begin{itemize}
+    \item The input to the first layer $\textbf{h}_0= \textbf{x}$ is zero-mean and has variance $\textbf{v}[\textbf{h}_0]= v_0$
+    \item The weights $W_i$ are initialized with zero mean and variance $\textbf{v}[\textbf{h}_0]= \sigma_W^2$, and biases are ignored for simplicity. 
+    \item Each layer then computes $\textbf{h}_i= \sigma(W_i \textbf{h}_{i-1})$ where $\sigma$ is the ReLU activation function.
+\end{itemize}
+
+Since ReLU introduces sparsity, it affects the variance propagation:
+\begin{equation}
+    \textbf{v}[\textbf{h}_i]= \frac{1}{2} D_{i-1} \sigma_W^2 \textbf{v}[h_{i-1}]
+\end{equation}
+
+We can then expand recursively for all layers and set $v_L=v_0$ for stable activations:
+\begin{equation}
+    v_L= \left(\frac{1}{2} D_0 \sigma_W^2 \right)^L v_0
+\end{equation}
+\begin{equation}
+    \sigma_W^2= \frac{2}{D_{i-1}}
+\end{equation}
+
+For backward variance propagation, we can analyze the gradient variance:
+\begin{equation}
+    \textbf{v}\left[\frac{\partial \ell}{\partial \textbf{h}_i}\right]= \frac{1}{2} D_i \sigma_W^2 \textbf{v}\left[\frac{\partial \ell}{\partial \textbf{h}_{i+1}}\right]
+\end{equation}
+
+For stable gradient variance, we need $\sigma_W^2= \frac{2}{D_i}$. To balance both forward and backwards variance conditions, we can use $\sigma_W^2= \frac{2}{D_{i-1}}$. This means we can initialize weights as:
+\begin{equation}
+    W_i \sim \mathcal{N} \left(0, \frac{2}{D_{i-1}} \right)
+\end{equation}
+}
+
+\end{document}
